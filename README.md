@@ -6,6 +6,9 @@ Dead simple CLI tool to tell you which bloody trains are delayed/cancelled, inni
 
 ## CLI Usage
 
+A token for the use of the National Rail SOAP API is required. You can get one [here.](https://realtime.
+nationalrail.co.uk/OpenLDBWSRegistration/).
+
 ```sh
 # Check onced
 train-cli check --from "StationA" --to "StationB"
@@ -14,4 +17,4 @@ train-cli check --from "StationA" --to "StationB"
 train-cli check --from "StationA" --to "StationB" --continuous
 ```
 
-> **Note**: The `--from` and `--to` flags are __NOT__ required. Recommended to use the input search.
+> **Note**: The `--from` and `--to` flags are __NOT__ required. Recommended to use the in-built input search.

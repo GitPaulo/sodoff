@@ -11,6 +11,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
 	nr "github.com/martinsirbe/go-national-rail-client/nationalrail"
+	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +44,31 @@ func init() {
 	rootCmd.Flags().StringVarP(&destinationStation, "to", "t", "", "Destination station CRS code or name")
 }
 
+func checkAccessToken() bool {
+	const tokenEnvVar = "NR_ACCESS_TOKEN"
+	const tokenURL = "https://www.nationalrail.co.uk/developers/"
+	token := os.Getenv(tokenEnvVar)
+	if token == "" {
+		fmt.Println(color.RedString("ERROR: National Rail API access token not found!"))
+		fmt.Println("Please set the environment variable", color.CyanString(tokenEnvVar), "with your National Rail API access token.")
+		fmt.Println("You can obtain a token from the following link:")
+		fmt.Println(color.CyanString(tokenURL))
+
+		// Open the URL in the default browser
+		err := open.Run(tokenURL)
+		if err != nil {
+			fmt.Println("Please visit the URL to obtain your token:", tokenURL)
+		}
+		return false
+	}
+	return true
+}
+
 func runRootCmd(cmd *cobra.Command, args []string) {
+	if !checkAccessToken() {
+		return
+	}
+
 	from, _ := cmd.Flags().GetString("from")
 	to, _ := cmd.Flags().GetString("to")
 
