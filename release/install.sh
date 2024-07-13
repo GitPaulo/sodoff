@@ -9,11 +9,11 @@ ARCH=$(uname -m)
 
 # Set the download URL based on the OS
 if [ "$OS" = "Linux" ]; then
-    URL="https://github.com/GitPaulo/$PROJECT_NAME/releases/download/v$VERSION/${PROJECT_NAME}-linux"
+    URL="https://github.com/GitPaulo/$PROJECT_NAME/releases/download/$VERSION/${PROJECT_NAME}-linux"
 elif [ "$OS" = "Darwin" ]; then
-    URL="https://github.com/GitPaulo/$PROJECT_NAME/releases/download/v$VERSION/${PROJECT_NAME}-macos"
+    URL="https://github.com/GitPaulo/$PROJECT_NAME/releases/download/$VERSION/${PROJECT_NAME}-macos"
 elif [ "$OS" = "MINGW32_NT" ] || [ "$OS" = "MINGW64_NT" ]; then
-    URL="https://github.com/GitPaulo/$PROJECT_NAME/releases/download/v$VERSION/${PROJECT_NAME}-windows.exe"
+    URL="https://github.com/GitPaulo/$PROJECT_NAME/releases/download/$VERSION/${PROJECT_NAME}-windows.exe"
 else
     echo "Unsupported OS: $OS"
     exit 1

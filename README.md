@@ -4,6 +4,12 @@ Dead simple CLI tool to tell you which bloody trains are delayed/cancelled, inni
 
 ![img.png](img.png)
 
+## Install
+
+```sh
+curl -o- https://raw.githubusercontent.com/GitPaulo/sodoff/main/release/install.sh | bash
+```
+
 ## CLI Usage
 
 A token for the use of the National Rail SOAP API is required. You can get one [here.](https://realtime.nationalrail.co.uk/OpenLDBWSRegistration/).
