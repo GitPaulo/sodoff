@@ -72,14 +72,14 @@ func runRootCmd(cmd *cobra.Command, args []string) {
 	from, _ := cmd.Flags().GetString("from")
 	to, _ := cmd.Flags().GetString("to")
 
-	departureStation := validateStationInput(from, "Select Departure Station")
-	if departureStation == "" {
+	departureStationCRS := validateStationInput(from, "Select Departure Station")
+	if departureStationCRS == "" {
 		fmt.Printf("Invalid departure station: %s\n", from)
 		return
 	}
 
-	destinationStation := validateStationInput(to, "Select Destination Station")
-	if destinationStation == "" {
+	destinationStationCRS := validateStationInput(to, "Select Destination Station")
+	if destinationStationCRS == "" {
 		fmt.Printf("Invalid destination station: %s\n", to)
 		return
 	}
@@ -89,11 +89,11 @@ func runRootCmd(cmd *cobra.Command, args []string) {
 		for {
 			select {
 			case <-ticker.C:
-				display(departureStation, destinationStation)
+				display(departureStationCRS, destinationStationCRS)
 			}
 		}
 	} else {
-		display(departureStation, destinationStation)
+		display(departureStationCRS, destinationStationCRS)
 	}
 }
 
@@ -196,30 +196,27 @@ func fuzzySearch(input, item string) bool {
 	return false
 }
 
-func display(departureStation, destinationStation string) {
-	departureBoard, err := api.GetDeparturesBoard(nr.CRSCode(departureStation))
+func display(departureStationCRS, destinationStationCRS string) {
+	departureBoard, err := api.GetDeparturesBoard(nr.CRSCode(departureStationCRS))
 	if err != nil {
-		fmt.Printf("Error fetching station board for %s: %v\n", departureStation, err)
+		fmt.Printf("Error fetching station board for %s: %v\n", departureStationCRS, err)
 		return
 	}
-	fmt.Println(displayDepartureBoard(departureStation, departureBoard, "Departure Board"))
+	fmt.Println(displayDepartureBoard(departureStationCRS, destinationStationCRS, departureBoard, "Departure Board"))
 
-	arrivalBoard, err := api.GetArrivalsBoard(nr.CRSCode(destinationStation))
+	arrivalBoard, err := api.GetArrivalsBoard(nr.CRSCode(destinationStationCRS))
 	if err != nil {
-		fmt.Printf("Error fetching station board for %s: %v\n", destinationStation, err)
+		fmt.Printf("Error fetching station board for %s: %v\n", destinationStationCRS, err)
 		return
 	}
-	fmt.Println(displayArrivalBoard(destinationStation, arrivalBoard, "Arrivals Board"))
+	fmt.Println(displayArrivalBoard(destinationStationCRS, departureStationCRS, arrivalBoard, "Arrivals Board"))
 }
 
-func displayDepartureBoard(station string, board *nr.StationBoard, boardTitle string) string {
-	stationName := ""
-	if name, exists := nr.StationCodeToNameMap[nr.CRSCode(station)]; exists {
-		stationName = name
-	}
+func displayDepartureBoard(departureStationCRS, destinationStationCRS string, board *nr.StationBoard, boardTitle string) string {
+	departureStationName := getStationName(departureStationCRS)
 
 	titleFigure := figure.NewColorFigure(
-		fmt.Sprintf("%s - %s [%s]", boardTitle, stationName, station),
+		fmt.Sprintf("%s - %s [%s]", boardTitle, departureStationName, departureStationCRS),
 		"short",
 		"green",
 		true,
@@ -227,6 +224,8 @@ func displayDepartureBoard(station string, board *nr.StationBoard, boardTitle st
 	titleFigure.Print()
 
 	var builder strings.Builder
+	var reasonsBuilder strings.Builder
+
 	builder.WriteString("=========================================================================================================\n")
 	builder.WriteString(fmt.Sprintf("%-10s %-30s %-10s %-10s %-20s %-40s\n", "STD", "Destination", "Platform", "Status", "ETD", "Operator"))
 	builder.WriteString("---------------------------------------------------------------------------------------------------------\n")
@@ -253,23 +252,36 @@ func displayDepartureBoard(station string, board *nr.StationBoard, boardTitle st
 		}
 
 		row := fmt.Sprintf("%-10s %-30s %-10s ", std, destination, platform)
-		builder.WriteString(row)
-		statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, etd, service.Operator)
+
+		if containsIntermediateStation(service, departureStationCRS, destinationStationCRS) {
+			color.New(color.BgBlue).Fprint(&builder, row)
+			statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, etd, service.Operator)
+		} else {
+			builder.WriteString(row)
+			statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, etd, service.Operator)
+		}
+
+		if service.DelayReason != nil {
+			reasonsBuilder.WriteString(fmt.Sprintf("%s to %s - %s\n", departureStationName, destination, *service.DelayReason))
+		}
 	}
 
 	builder.WriteString("=========================================================================================================\n")
+	if reasonsBuilder.Len() > 0 {
+		builder.WriteString("Reasons for delays/cancellations:\n")
+		builder.WriteString("\t‣ ")
+		builder.WriteString(reasonsBuilder.String())
+		builder.WriteString("=========================================================================================================\n")
+	}
 
 	return builder.String()
 }
 
-func displayArrivalBoard(station string, board *nr.StationBoard, boardTitle string) string {
-	stationName := ""
-	if name, exists := nr.StationCodeToNameMap[nr.CRSCode(station)]; exists {
-		stationName = name
-	}
+func displayArrivalBoard(arrivalStationCRS, departureStationCRS string, board *nr.StationBoard, boardTitle string) string {
+	arrivalStationName := getStationName(arrivalStationCRS)
 
 	titleFigure := figure.NewColorFigure(
-		fmt.Sprintf("%s - %s [%s]", boardTitle, stationName, station),
+		fmt.Sprintf("%s - %s [%s]", boardTitle, arrivalStationName, arrivalStationCRS),
 		"short",
 		"green",
 		true,
@@ -277,6 +289,8 @@ func displayArrivalBoard(station string, board *nr.StationBoard, boardTitle stri
 	titleFigure.Print()
 
 	var builder strings.Builder
+	var reasonsBuilder strings.Builder
+
 	builder.WriteString("=========================================================================================================\n")
 	builder.WriteString(fmt.Sprintf("%-10s %-30s %-10s %-10s %-20s %-40s\n", "STA", "Origin", "Platform", "Status", "ETA", "Operator"))
 	builder.WriteString("---------------------------------------------------------------------------------------------------------\n")
@@ -306,13 +320,45 @@ func displayArrivalBoard(station string, board *nr.StationBoard, boardTitle stri
 		}
 
 		row := fmt.Sprintf("%-10s %-30s %-10s ", sta, origin, platform)
-		builder.WriteString(row)
-		statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, eta, service.Operator)
+
+		if containsIntermediateStation(service, departureStationCRS, arrivalStationCRS) {
+			color.New(color.BgBlue).Fprint(&builder, row)
+			statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, eta, service.Operator)
+		} else {
+			builder.WriteString(row)
+			statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, eta, service.Operator)
+		}
+
+		if service.DelayReason != nil {
+			reasonsBuilder.WriteString(fmt.Sprintf("%s to %s - %s\n", origin, arrivalStationName, *service.DelayReason))
+		}
 	}
 
 	builder.WriteString("=========================================================================================================\n")
+	if reasonsBuilder.Len() > 0 {
+		builder.WriteString("Reasons for delays/cancellations:\n")
+		builder.WriteString("\t‣ ")
+		builder.WriteString(reasonsBuilder.String())
+		builder.WriteString("=========================================================================================================\n")
+	}
 
 	return builder.String()
+}
+
+func containsIntermediateStation(service *nr.TrainService, departureStationCRS, destinationStationCRS string) bool {
+	for _, callingPoint := range service.SubsequentCallingPoints {
+		if callingPoint.CRS == departureStationCRS || callingPoint.CRS == destinationStationCRS {
+			return true
+		}
+	}
+	return false
+}
+
+func getStationName(crs string) string {
+	if name, exists := nr.StationCodeToNameMap[nr.CRSCode(crs)]; exists {
+		return name
+	}
+	return crs
 }
 
 func getStatus(service *nr.TrainService) string {
