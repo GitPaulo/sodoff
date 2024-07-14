@@ -22,6 +22,7 @@ var (
 	destinationStation string
 	numRows            int
 	timeWindow         int
+	showJourneys       bool
 )
 
 func Execute() {
@@ -46,6 +47,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&destinationStation, "to", "t", "", "Destination station CRS code or name")
 	rootCmd.Flags().IntVarP(&numRows, "rows", "r", 10, "Number of rows to fetch (Don't change this unless you know what you're doing)")
 	rootCmd.Flags().IntVarP(&timeWindow, "time-window", "w", 60, "Time window in minutes")
+	rootCmd.Flags().BoolVarP(&showJourneys, "show-journeys", "j", false, "Show full journey of highlighted trains")
 }
 
 func checkAccessToken() bool {
@@ -231,6 +233,7 @@ func displayDepartureBoard(departureStationCRS, destinationStationCRS string, bo
 
 	var builder strings.Builder
 	var reasonsBuilder strings.Builder
+	var journeys []string
 
 	builder.WriteString("=========================================================================================================\n")
 	builder.WriteString(fmt.Sprintf("%-10s %-30s %-10s %-10s %-20s %-40s\n", "STD", "Destination", "Platform", "Status", "ETD", "Operator"))
@@ -259,9 +262,11 @@ func displayDepartureBoard(departureStationCRS, destinationStationCRS string, bo
 
 		row := fmt.Sprintf("%-10s %-30s %-10s ", std, destination, platform)
 
-		if containsIntermediateStation(service, departureStationCRS, destinationStationCRS) {
+		highlight := containsIntermediateStation(service, departureStationCRS, destinationStationCRS)
+		if highlight {
 			color.New(color.BgBlue).Fprint(&builder, row)
 			statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, etd, service.Operator)
+			journeys = append(journeys, formatJourney(service))
 		} else {
 			builder.WriteString(row)
 			statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, etd, service.Operator)
@@ -277,6 +282,14 @@ func displayDepartureBoard(departureStationCRS, destinationStationCRS string, bo
 		builder.WriteString("Reasons for delays/cancellations:\n")
 		builder.WriteString("\t‣ ")
 		builder.WriteString(reasonsBuilder.String())
+		builder.WriteString("=========================================================================================================\n")
+	}
+
+	if showJourneys && len(journeys) > 0 {
+		builder.WriteString("Highlighted Journeys:\n")
+		for _, journey := range journeys {
+			builder.WriteString(journey)
+		}
 		builder.WriteString("=========================================================================================================\n")
 	}
 
@@ -296,6 +309,7 @@ func displayArrivalBoard(arrivalStationCRS, departureStationCRS string, board *n
 
 	var builder strings.Builder
 	var reasonsBuilder strings.Builder
+	var journeys []string
 
 	builder.WriteString("=========================================================================================================\n")
 	builder.WriteString(fmt.Sprintf("%-10s %-30s %-10s %-10s %-20s %-40s\n", "STA", "Origin", "Platform", "Status", "ETA", "Operator"))
@@ -327,9 +341,11 @@ func displayArrivalBoard(arrivalStationCRS, departureStationCRS string, board *n
 
 		row := fmt.Sprintf("%-10s %-30s %-10s ", sta, origin, platform)
 
-		if containsIntermediateStation(service, departureStationCRS, arrivalStationCRS) {
+		highlight := containsIntermediateStation(service, departureStationCRS, arrivalStationCRS)
+		if highlight {
 			color.New(color.BgBlue).Fprint(&builder, row)
 			statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, eta, service.Operator)
+			journeys = append(journeys, formatJourney(service))
 		} else {
 			builder.WriteString(row)
 			statusColor.Fprintf(&builder, "%-10s %-20s %-40s\n", status, eta, service.Operator)
@@ -346,6 +362,47 @@ func displayArrivalBoard(arrivalStationCRS, departureStationCRS string, board *n
 		builder.WriteString(reasonsBuilder.String())
 		builder.WriteString("=========================================================================================================\n")
 	}
+
+	if showJourneys && len(journeys) > 0 {
+		builder.WriteString("Highlighted Journeys:\n")
+		for _, journey := range journeys {
+			builder.WriteString(journey)
+		}
+		builder.WriteString("=========================================================================================================\n")
+	}
+
+	return builder.String()
+}
+
+func formatJourney(service *nr.TrainService) string {
+	var builder strings.Builder
+
+	builder.WriteString(fmt.Sprintf("\n🚆 Journey for %s to %s: \n", service.Origin.Name, service.Destination.Name))
+	builder.WriteString("  ┌─── [Origin]\n")
+
+	// Previous calling points (already visited)
+	for _, callingPoint := range service.PreviousCallingPoints {
+		arrivalTime := "N/A"
+		if callingPoint.At != nil {
+			arrivalTime = *callingPoint.At
+		}
+		builder.WriteString(color.BlueString(fmt.Sprintf("  │   %s - %s\n", callingPoint.Name, arrivalTime)))
+	}
+
+	// Current station
+	builder.WriteString(color.GreenString(fmt.Sprintf("  ├─── %s\n", service.Origin.Name)))
+
+	// Subsequent calling points (yet to visit)
+	for _, callingPoint := range service.SubsequentCallingPoints {
+		estimatedTime := "N/A"
+		if callingPoint.Et != nil {
+			estimatedTime = *callingPoint.Et
+		}
+		builder.WriteString(fmt.Sprintf("  │   %s - %s\n", callingPoint.Name, estimatedTime))
+	}
+
+	// Final destination
+	builder.WriteString(fmt.Sprintf("  └─── [Destination]\n"))
 
 	return builder.String()
 }
