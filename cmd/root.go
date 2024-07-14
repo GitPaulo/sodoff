@@ -20,6 +20,8 @@ var (
 	interval           int
 	departureStation   string
 	destinationStation string
+	numRows            int
+	timeWindow         int
 )
 
 func Execute() {
@@ -42,6 +44,8 @@ func init() {
 	rootCmd.Flags().IntVarP(&interval, "interval", "i", 5, "Polling interval in seconds")
 	rootCmd.Flags().StringVarP(&departureStation, "from", "f", "", "Departure station CRS code or name")
 	rootCmd.Flags().StringVarP(&destinationStation, "to", "t", "", "Destination station CRS code or name")
+	rootCmd.Flags().IntVarP(&numRows, "rows", "r", 10, "Number of rows to fetch (Don't change this unless you know what you're doing)")
+	rootCmd.Flags().IntVarP(&timeWindow, "time-window", "w", 60, "Time window in minutes")
 }
 
 func checkAccessToken() bool {
@@ -71,6 +75,8 @@ func runRootCmd(cmd *cobra.Command, args []string) {
 
 	from, _ := cmd.Flags().GetString("from")
 	to, _ := cmd.Flags().GetString("to")
+	numRows, _ := cmd.Flags().GetInt("rows")
+	timeWindow, _ := cmd.Flags().GetInt("time-window")
 
 	departureStationCRS := validateStationInput(from, "Select Departure Station")
 	if departureStationCRS == "" {
@@ -89,11 +95,11 @@ func runRootCmd(cmd *cobra.Command, args []string) {
 		for {
 			select {
 			case <-ticker.C:
-				display(departureStationCRS, destinationStationCRS)
+				display(departureStationCRS, destinationStationCRS, numRows, timeWindow)
 			}
 		}
 	} else {
-		display(departureStationCRS, destinationStationCRS)
+		display(departureStationCRS, destinationStationCRS, numRows, timeWindow)
 	}
 }
 
@@ -196,15 +202,15 @@ func fuzzySearch(input, item string) bool {
 	return false
 }
 
-func display(departureStationCRS, destinationStationCRS string) {
-	departureBoard, err := api.GetDeparturesBoard(nr.CRSCode(departureStationCRS))
+func display(departureStationCRS, destinationStationCRS string, numRows int, timeWindowMinutes int) {
+	departureBoard, err := api.GetDeparturesBoard(nr.CRSCode(departureStationCRS), numRows, timeWindowMinutes)
 	if err != nil {
 		fmt.Printf("Error fetching station board for %s: %v\n", departureStationCRS, err)
 		return
 	}
 	fmt.Println(displayDepartureBoard(departureStationCRS, destinationStationCRS, departureBoard, "Departure Board"))
 
-	arrivalBoard, err := api.GetArrivalsBoard(nr.CRSCode(destinationStationCRS))
+	arrivalBoard, err := api.GetArrivalsBoard(nr.CRSCode(destinationStationCRS), numRows, timeWindowMinutes)
 	if err != nil {
 		fmt.Printf("Error fetching station board for %s: %v\n", destinationStationCRS, err)
 		return
@@ -337,7 +343,6 @@ func displayArrivalBoard(arrivalStationCRS, departureStationCRS string, board *n
 	builder.WriteString("=========================================================================================================\n")
 	if reasonsBuilder.Len() > 0 {
 		builder.WriteString("Reasons for delays/cancellations:\n")
-		builder.WriteString("\t‣ ")
 		builder.WriteString(reasonsBuilder.String())
 		builder.WriteString("=========================================================================================================\n")
 	}

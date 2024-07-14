@@ -27,19 +27,18 @@ func SearchStations(query string) ([]nr.Location, error) {
 	return results, nil
 }
 
-func GetArrivalsBoard(crs nr.CRSCode) (*nr.StationBoard, error) {
-	// Requires: env var NR_ACCESS_TOKEN
+// GetArrivalsBoard fetches the arrivals board for a given CRS code with custom options.
+func GetArrivalsBoard(crs nr.CRSCode, numRows int, timeWindowMinutes int) (*nr.StationBoard, error) {
 	client, err := nr.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 
-	board, err := client.GetArrivals(crs, nr.NumRowsOpt(10))
+	board, err := client.GetArrivalsWithDetails(crs, nr.NumRowsOpt(numRows), nr.TimeWindowMinutesOpt(timeWindowMinutes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get arrivals board: %v", err)
+		return nil, fmt.Errorf("failed to get arrival board: %v", err)
 	}
 
-	// No services found. Alert the user.
 	if len(board.TrainServices) == 0 {
 		fmt.Println("No train services found for station:", nr.StationCodeToNameMap[crs])
 	}
@@ -47,19 +46,18 @@ func GetArrivalsBoard(crs nr.CRSCode) (*nr.StationBoard, error) {
 	return board, nil
 }
 
-func GetDeparturesBoard(crs nr.CRSCode) (*nr.StationBoard, error) {
-	// Requires: env var NR_ACCESS_TOKEN
+// GetDeparturesBoard fetches the departures board for a given CRS code with custom options.
+func GetDeparturesBoard(crs nr.CRSCode, numRows int, timeWindowMinutes int) (*nr.StationBoard, error) {
 	client, err := nr.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 
-	board, err := client.GetDepartures(crs, nr.NumRowsOpt(10))
+	board, err := client.GetDeparturesWithDetails(crs, nr.NumRowsOpt(numRows), nr.TimeWindowMinutesOpt(timeWindowMinutes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get departures board: %v", err)
+		return nil, fmt.Errorf("failed to get departure board: %v", err)
 	}
 
-	// No services found. Alert the user.
 	if len(board.TrainServices) == 0 {
 		fmt.Println("No train services found for station:", nr.StationCodeToNameMap[crs])
 	}
