@@ -16,10 +16,10 @@ A token for the use of the National Rail SOAP API is required. You can get one [
 
 ```sh
 # Check once
-sodoff --to MCO --from LIV
+sodoff --to MCO --from LIV --show-journeys
 
 # Continuously check every 2 seconds
-sodoff --to MCO --from LIV" --continuous
+sodoff --to MCO --from LIV" --continuous --show-journeys
 ```
 
 > **Note**: The `--from` and `--to` flags are __NOT__ required. Recommended to use the in-built input search.
