@@ -273,14 +273,13 @@ func displayDepartureBoard(departureStationCRS, destinationStationCRS string, bo
 		}
 
 		if service.DelayReason != nil {
-			reasonsBuilder.WriteString(fmt.Sprintf("%s to %s - %s\n", departureStationName, destination, *service.DelayReason))
+			reasonsBuilder.WriteString(fmt.Sprintf("\t‣ %s to %s - %s\n", departureStationName, destination, *service.DelayReason))
 		}
 	}
 
 	builder.WriteString("=========================================================================================================\n")
 	if reasonsBuilder.Len() > 0 {
 		builder.WriteString("Reasons for delays/cancellations:\n")
-		builder.WriteString("\t‣ ")
 		builder.WriteString(reasonsBuilder.String())
 		builder.WriteString("=========================================================================================================\n")
 	}
@@ -352,7 +351,7 @@ func displayArrivalBoard(arrivalStationCRS, departureStationCRS string, board *n
 		}
 
 		if service.DelayReason != nil {
-			reasonsBuilder.WriteString(fmt.Sprintf("%s to %s - %s\n", origin, arrivalStationName, *service.DelayReason))
+			reasonsBuilder.WriteString(fmt.Sprintf("\t‣ %s to %s - %s\n", origin, arrivalStationName, *service.DelayReason))
 		}
 	}
 
@@ -377,8 +376,13 @@ func displayArrivalBoard(arrivalStationCRS, departureStationCRS string, board *n
 func formatJourney(service *nr.TrainService) string {
 	var builder strings.Builder
 
-	builder.WriteString(fmt.Sprintf("\n🚆 Journey for %s to %s: \n", service.Origin.Name, service.Destination.Name))
-	builder.WriteString("  ┌─── [Origin]\n")
+	builder.WriteString(fmt.Sprintf("\n🚆 %s Journey ‣ %s to %s: \n",
+		service.STD,
+		service.Origin.Name,
+		service.Destination.Name,
+	))
+	// Origin station
+	builder.WriteString(fmt.Sprintf("  ┌─── [Origin: %s]\n", service.Origin.Name))
 
 	// Previous calling points (already visited)
 	for _, callingPoint := range service.PreviousCallingPoints {
@@ -388,9 +392,6 @@ func formatJourney(service *nr.TrainService) string {
 		}
 		builder.WriteString(color.BlueString(fmt.Sprintf("  │   %s - %s\n", callingPoint.Name, arrivalTime)))
 	}
-
-	// Current station
-	builder.WriteString(color.GreenString(fmt.Sprintf("  ├─── %s\n", service.Origin.Name)))
 
 	// Subsequent calling points (yet to visit)
 	for _, callingPoint := range service.SubsequentCallingPoints {
@@ -402,7 +403,7 @@ func formatJourney(service *nr.TrainService) string {
 	}
 
 	// Final destination
-	builder.WriteString(fmt.Sprintf("  └─── [Destination]\n"))
+	builder.WriteString(fmt.Sprintf("  └─── [Destination: %s]\n", service.Destination.Name))
 
 	return builder.String()
 }
