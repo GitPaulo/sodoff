@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"sodoff/api"
 	"strings"
@@ -13,6 +14,14 @@ import (
 	nr "github.com/martinsirbe/go-national-rail-client/nationalrail"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
+)
+
+const (
+	defaultInterval   = 5
+	defaultNumRows    = 10
+	defaultTimeWindow = 60
+	tokenEnvVar       = "NR_ACCESS_TOKEN"
+	tokenURL          = "https://www.nationalrail.co.uk/developers/"
 )
 
 var (
@@ -27,7 +36,7 @@ var (
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		os.Exit(1)
 	}
 }
@@ -42,17 +51,15 @@ cancellations.`,
 
 func init() {
 	rootCmd.Flags().BoolVarP(&continuous, "continuous", "c", false, "Continuously check for updates")
-	rootCmd.Flags().IntVarP(&interval, "interval", "i", 5, "Polling interval in seconds")
+	rootCmd.Flags().IntVarP(&interval, "interval", "i", defaultInterval, "Polling interval in seconds")
 	rootCmd.Flags().StringVarP(&departureStation, "from", "f", "", "Departure station CRS code or name")
 	rootCmd.Flags().StringVarP(&destinationStation, "to", "t", "", "Destination station CRS code or name")
-	rootCmd.Flags().IntVarP(&numRows, "rows", "r", 10, "Number of rows to fetch (Don't change this unless you know what you're doing)")
-	rootCmd.Flags().IntVarP(&timeWindow, "time-window", "w", 60, "Time window in minutes")
+	rootCmd.Flags().IntVarP(&numRows, "rows", "r", defaultNumRows, "Number of rows to fetch (Don't change this unless you know what you're doing)")
+	rootCmd.Flags().IntVarP(&timeWindow, "time-window", "w", defaultTimeWindow, "Time window in minutes")
 	rootCmd.Flags().BoolVarP(&showJourneys, "show-journeys", "j", false, "Show full journey of highlighted trains")
 }
 
 func checkAccessToken() bool {
-	const tokenEnvVar = "NR_ACCESS_TOKEN"
-	const tokenURL = "https://www.nationalrail.co.uk/developers/"
 	token := os.Getenv(tokenEnvVar)
 	if token == "" {
 		fmt.Println(color.RedString("ERROR: National Rail API access token not found!"))
@@ -61,8 +68,7 @@ func checkAccessToken() bool {
 		fmt.Println(color.CyanString(tokenURL))
 
 		// Open the URL in the default browser
-		err := open.Run(tokenURL)
-		if err != nil {
+		if err := open.Run(tokenURL); err != nil {
 			fmt.Println("Please visit the URL to obtain your token:", tokenURL)
 		}
 		return false
@@ -82,13 +88,13 @@ func runRootCmd(cmd *cobra.Command, args []string) {
 
 	departureStationCRS := validateStationInput(from, "Select Departure Station")
 	if departureStationCRS == "" {
-		fmt.Printf("Invalid departure station: %s\n", from)
+		log.Printf("Invalid departure station: %s\n", from)
 		return
 	}
 
 	destinationStationCRS := validateStationInput(to, "Select Destination Station")
 	if destinationStationCRS == "" {
-		fmt.Printf("Invalid destination station: %s\n", to)
+		log.Printf("Invalid destination station: %s\n", to)
 		return
 	}
 
@@ -112,7 +118,7 @@ func validateStationInput(station, promptLabel string) string {
 
 	validStation := getStationCode(station)
 	if validStation == "" {
-		fmt.Printf("Invalid station: %s\n", station)
+		log.Printf("Invalid station: %s\n", station)
 		return selectStation(promptLabel)
 	}
 
@@ -127,7 +133,7 @@ func getStationCode(station string) string {
 
 	stations, err := api.SearchStations(station)
 	if err != nil {
-		fmt.Printf("Failed to search stations: %v\n", err)
+		log.Printf("Failed to search stations: %v\n", err)
 		return ""
 	}
 
@@ -151,13 +157,13 @@ func selectStation(promptLabel string) string {
 
 		searchQuery, err := prompt.Run()
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
+			log.Printf("Prompt failed %v\n", err)
 			return ""
 		}
 
 		stations, err := api.SearchStations(searchQuery)
 		if err != nil {
-			fmt.Printf("Failed to search stations: %v\n", err)
+			log.Printf("Failed to search stations: %v\n", err)
 			return ""
 		}
 
@@ -184,7 +190,7 @@ func selectStation(promptLabel string) string {
 
 		_, stationName, err := selectPrompt.Run()
 		if err != nil {
-			fmt.Printf("Prompt failed %v\n", err)
+			log.Printf("Prompt failed %v\n", err)
 			return ""
 		}
 
@@ -207,14 +213,14 @@ func fuzzySearch(input, item string) bool {
 func display(departureStationCRS, destinationStationCRS string, numRows int, timeWindowMinutes int) {
 	departureBoard, err := api.GetDeparturesBoard(nr.CRSCode(departureStationCRS), numRows, timeWindowMinutes)
 	if err != nil {
-		fmt.Printf("Error fetching station board for %s: %v\n", departureStationCRS, err)
+		log.Printf("Error fetching station board for %s: %v\n", departureStationCRS, err)
 		return
 	}
 	fmt.Println(displayDepartureBoard(departureStationCRS, destinationStationCRS, departureBoard, "Departure Board"))
 
 	arrivalBoard, err := api.GetArrivalsBoard(nr.CRSCode(destinationStationCRS), numRows, timeWindowMinutes)
 	if err != nil {
-		fmt.Printf("Error fetching station board for %s: %v\n", destinationStationCRS, err)
+		log.Printf("Error fetching station board for %s: %v\n", destinationStationCRS, err)
 		return
 	}
 	fmt.Println(displayArrivalBoard(destinationStationCRS, departureStationCRS, arrivalBoard, "Arrivals Board"))
@@ -381,7 +387,6 @@ func formatJourney(service *nr.TrainService) string {
 		service.Origin.Name,
 		service.Destination.Name,
 	))
-	// Origin station
 	builder.WriteString(fmt.Sprintf("  ┌─── [Origin: %s]\n", service.Origin.Name))
 
 	// Previous calling points (already visited)
@@ -402,9 +407,7 @@ func formatJourney(service *nr.TrainService) string {
 		builder.WriteString(fmt.Sprintf("  │   %s - %s\n", callingPoint.Name, estimatedTime))
 	}
 
-	// Final destination
 	builder.WriteString(fmt.Sprintf("  └─── [Destination: %s]\n", service.Destination.Name))
-
 	return builder.String()
 }
 

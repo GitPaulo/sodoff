@@ -7,6 +7,7 @@ import (
 	nr "github.com/martinsirbe/go-national-rail-client/nationalrail"
 )
 
+// SearchStations searches for stations by name.
 func SearchStations(query string) ([]nr.Location, error) {
 	query = strings.ToLower(query)
 	var results []nr.Location
